@@ -1,0 +1,42 @@
+# Go build output
+goit
+goit.exe
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (Go Modules)
+# Usually committed, but can be ignored if desired
+# vendor/
+
+# IDE/Editor specific files
+.vscode/
+.idea/
+*.swp
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log files
+*.log
+
+# Environment variables file (if used)
+.env
+
+#.goit repository
+.goit
