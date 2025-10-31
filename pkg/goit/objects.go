@@ -25,6 +25,20 @@ func FormatObject(objType string, content []byte) []byte {
 	return append([]byte(header), content...)
 }
 
+func GetBlobHash(filePath string) (string, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("reading file %s: %w", filePath, err)
+	}
+
+	fullData := FormatObject("blob", content)
+	hashStr := CalculateHash(fullData)
+	return hashStr, nil
+}
+
 func HashObject(filePath string, write bool, objType string) (string, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -63,7 +77,6 @@ func WriteObject(hash string, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("creating object file %s: %w", objectPath, err)
 	}
-
 	fileClosed := false
 	defer func() {
 		if !fileClosed {
@@ -105,15 +118,14 @@ func ReadObject(hash string) ([]byte, error) {
 
 	zlibReader, err := zlib.NewReader(file)
 	if err != nil {
-		return nil, fmt.Errorf("creating zlib reader: %w", err)
+		return nil, fmt.Errorf("creating zlib reader for %s: %w", objectPath, err)
 	}
 	defer zlibReader.Close()
 
 	decompressedData, err := io.ReadAll(zlibReader)
 	if err != nil {
-		return nil, fmt.Errorf("decompressing object data: %w", err)
+		return nil, fmt.Errorf("decompressing object data from %s: %w", objectPath, err)
 	}
-
 	return decompressedData, nil
 }
 
@@ -121,7 +133,7 @@ func ParseObject(rawData []byte) (objType string, content []byte, err error) {
 	nullByteIndex := bytes.IndexByte(rawData, 0)
 	if nullByteIndex == -1 {
 		err = fmt.Errorf("invalid object format: missing null byte separator")
-		return "", nil, err
+		return
 	}
 
 	header := rawData[:nullByteIndex]
@@ -130,7 +142,7 @@ func ParseObject(rawData []byte) (objType string, content []byte, err error) {
 	headerParts := bytes.SplitN(header, []byte(" "), 2)
 	if len(headerParts) != 2 {
 		err = fmt.Errorf("invalid object format: malformed header '%s'", string(header))
-		return "", nil, err
+		return
 	}
 
 	objType = string(headerParts[0])
@@ -138,15 +150,15 @@ func ParseObject(rawData []byte) (objType string, content []byte, err error) {
 	expectedSize, parseErr := strconv.Atoi(sizeStr)
 	if parseErr != nil {
 		err = fmt.Errorf("invalid object format: non-integer size '%s' in header", sizeStr)
-		return "", nil, err
+		return
 	}
 
 	if len(content) != expectedSize {
 		err = fmt.Errorf("invalid object format: actual size (%d) does not match header size (%d)", len(content), expectedSize)
-		return "", nil, err
+		return
 	}
 
-	return objType, content, nil
+	return
 }
 
 func CatFile(hash string) (objType string, content []byte, err error) {

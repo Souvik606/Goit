@@ -262,3 +262,10 @@ func (idx *Index) RemoveEntry(path string) {
 		delete(idx.Entries, path)
 	}
 }
+
+func (idx *Index) LoadAndGetEntries() (map[string]*IndexEntry, error) {
+	if err := idx.Load(); err != nil {
+		return nil, err
+	}
+	return idx.Entries, nil
+}

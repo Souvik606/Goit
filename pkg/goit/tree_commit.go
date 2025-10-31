@@ -23,6 +23,19 @@ func (a ByName) Len() int           { return len(a) }
 func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
+type ParsedCommit struct {
+	TreeHash      string
+	ParentHashes  []string
+	AuthorLine    string
+	CommitterLine string
+	Message       string
+}
+
+type LogEntry struct {
+	Hash   string
+	Commit *ParsedCommit
+}
+
 func buildTreeStructure(entries map[string]*IndexEntry) map[string]interface{} {
 	root := make(map[string]interface{})
 
@@ -189,6 +202,39 @@ func CommitTree(treeHash string, parentHashes []string, message string) (string,
 	return hashStr, nil
 }
 
+func Commit(message string) (string, string, error) {
+	treeHash, err := WriteTree()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to write tree: %w", err)
+	}
+
+	headRefPath, err := GetHeadRef()
+	if err != nil {
+		return "", "", err
+	}
+
+	parentHash, err := GetRefHash(headRefPath)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get parent hash from %s: %w", headRefPath, err)
+	}
+
+	var parentHashes []string
+	if parentHash != "" {
+		parentHashes = []string{parentHash}
+	}
+
+	newCommitHash, err := CommitTree(treeHash, parentHashes, message)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create commit object: %w", err)
+	}
+
+	if err := UpdateRef(headRefPath, newCommitHash); err != nil {
+		return "", "", fmt.Errorf("failed to update HEAD ref %s: %w", headRefPath, err)
+	}
+
+	return newCommitHash, headRefPath, nil
+}
+
 func ReadMessageFromStdin() (string, error) {
 	fmt.Println("Enter commit message (end with Ctrl+D or Ctrl+Z on Windows):")
 	scanner := bufio.NewScanner(os.Stdin)
@@ -205,4 +251,96 @@ func ReadMessageFromStdin() (string, error) {
 		return "", fmt.Errorf("aborting commit due to empty commit message")
 	}
 	return msg, nil
+}
+
+func ParseCommitObject(content []byte) (*ParsedCommit, error) {
+	commit := &ParsedCommit{
+		ParentHashes: make([]string, 0),
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+	var messageStarted bool
+	var message strings.Builder
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if messageStarted {
+			message.WriteString(line)
+			message.WriteString("\n")
+			continue
+		}
+
+		if line == "" {
+			messageStarted = true
+			continue
+		}
+
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("malformed commit object line: %s", line)
+		}
+		key, value := parts[0], parts[1]
+
+		switch key {
+		case "tree":
+			commit.TreeHash = value
+		case "parent":
+			commit.ParentHashes = append(commit.ParentHashes, value)
+		case "author":
+			commit.AuthorLine = value
+		case "committer":
+			commit.CommitterLine = value
+		default:
+
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning commit object content: %w", err)
+	}
+
+	commit.Message = strings.TrimSpace(message.String())
+	return commit, nil
+}
+
+func Log() ([]LogEntry, error) {
+	var history []LogEntry
+
+	headRef, err := GetHeadRef()
+	if err != nil {
+		return nil, err
+	}
+
+	currentHash, err := GetRefHash(headRef)
+	if err != nil {
+		return nil, err
+	}
+
+	for currentHash != "" {
+		objType, content, err := CatFile(currentHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read commit object %s: %w", currentHash, err)
+		}
+		if objType != "commit" {
+			return nil, fmt.Errorf("object %s is not a commit, but a %s", currentHash, objType)
+		}
+
+		commit, err := ParseCommitObject(content)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse commit object %s: %w", currentHash, err)
+		}
+
+		history = append(history, LogEntry{
+			Hash:   currentHash,
+			Commit: commit,
+		})
+
+		if len(commit.ParentHashes) > 0 {
+			currentHash = commit.ParentHashes[0]
+		} else {
+			currentHash = ""
+		}
+	}
+	return history, nil
 }

@@ -8,102 +8,116 @@ import (
 	"testing"
 )
 
-func TestCommitTree(t *testing.T) {
+func TestCommitPorcelain(t *testing.T) {
 	cleanup := setupTestRepo(t)
 	defer cleanup()
 
-	emptyTreeHash := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-	emptyTreeData := goit.FormatObject("tree", []byte{})
-	goit.WriteObject(emptyTreeHash, emptyTreeData)
-
-	parentHash := "0123456789abcdef0123456789abcdef01234567"
-	message := "Test initial commit\n\nWith a body."
-	expectedAuthor := "Test Author <author@test.com>"
-	expectedCommitter := "Test Committer <committer@test.com>"
-
-	os.Setenv("GOIT_AUTHOR_NAME", "Test Author")
-	os.Setenv("GOIT_AUTHOR_EMAIL", "author@test.com")
-
-	os.Setenv("GOIT_COMMITTER_NAME", "Test Committer")
-	os.Setenv("GOIT_COMMITTER_EMAIL", "committer@test.com")
-
-	defer os.Unsetenv("GOIT_AUTHOR_NAME")
-	defer os.Unsetenv("GOIT_AUTHOR_EMAIL")
-	defer os.Unsetenv("GOIT_COMMITTER_NAME")
-	defer os.Unsetenv("GOIT_COMMITTER_EMAIL")
-
-	commitHash, err := goit.CommitTree(emptyTreeHash, []string{parentHash}, message)
+	fileName := "file.txt"
+	fileContent1 := []byte("test content v1")
+	err := os.WriteFile(fileName, fileContent1, 0644)
 	if err != nil {
-		t.Fatalf("CommitTree failed: %v", err)
+		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	if len(commitHash) != 40 {
-		t.Errorf("Expected a 40-char hash, got %d chars: %s", len(commitHash), commitHash)
+	index := goit.NewIndex()
+	err = goit.AddPaths([]string{fileName}, index)
+	if err != nil {
+		t.Fatalf("AddPaths failed: %v", err)
+	}
+	err = index.Save()
+	if err != nil {
+		t.Fatalf("SaveIndex failed: %v", err)
 	}
 
-	objType, contentBytes, err := goit.CatFile(commitHash)
+	commitMsg1 := "Initial commit"
+	commitHash1, refUpdated, err := goit.Commit(commitMsg1)
 	if err != nil {
-		t.Fatalf("CatFile failed for commit hash %s: %v", commitHash, err)
+		t.Fatalf("goit.Commit (1) failed: %v", err)
+	}
+
+	if len(commitHash1) != 40 {
+		t.Errorf("Expected first commit hash to be 40 chars, got %d", len(commitHash1))
+	}
+	if refUpdated != "refs/heads/main" {
+		t.Errorf("Expected ref updated to be 'refs/heads/main', got '%s'", refUpdated)
+	}
+
+	headRef, err := goit.GetRefHash("refs/heads/main")
+	if err != nil {
+		t.Fatalf("Failed to read head ref after commit 1: %v", err)
+	}
+	if headRef != commitHash1 {
+		t.Errorf("HEAD ref content mismatch: got %s, want %s", headRef, commitHash1)
+	}
+
+	objType, contentBytes, err := goit.CatFile(commitHash1)
+	if err != nil {
+		t.Fatalf("CatFile failed for commit 1: %v", err)
 	}
 	if objType != "commit" {
 		t.Errorf("Expected object type 'commit', got '%s'", objType)
 	}
-
-	content := string(contentBytes)
-
-	if !strings.Contains(content, fmt.Sprintf("tree %s\n", emptyTreeHash)) {
-		t.Errorf("Commit missing correct tree hash line")
+	content1 := string(contentBytes)
+	if !strings.Contains(content1, "tree ") {
+		t.Errorf("Commit 1 content missing tree line")
 	}
-	if !strings.Contains(content, fmt.Sprintf("parent %s\n", parentHash)) {
-		t.Errorf("Commit missing correct parent hash line")
+	if strings.Contains(content1, "parent ") {
+		t.Errorf("Commit 1 (initial) should not have a parent line")
 	}
-	if !strings.Contains(content, fmt.Sprintf("author %s", expectedAuthor)) {
-		t.Errorf("Commit missing correct author line")
-	}
-	if !strings.Contains(content, fmt.Sprintf("committer %s", expectedCommitter)) {
-		t.Errorf("Commit missing correct committer line")
+	if !strings.Contains(content1, commitMsg1) {
+		t.Errorf("Commit 1 content missing commit message")
 	}
 
-	trimmedMessage := strings.TrimSpace(message)
-	if !strings.Contains(content, "\n\n"+trimmedMessage) {
-		t.Errorf("Commit missing correct message. Got:\n---\n%s\n---\nExpected message:\n---\n%s\n---\n", content, trimmedMessage)
-	}
-}
-
-func TestCommitTreeNoParent(t *testing.T) {
-	cleanup := setupTestRepo(t)
-	defer cleanup()
-
-	emptyTreeHash := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-	emptyTreeData := goit.FormatObject("tree", []byte{})
-	goit.WriteObject(emptyTreeHash, emptyTreeData)
-
-	os.Setenv("GOIT_AUTHOR_NAME", "Test Author")
-	os.Setenv("GOIT_AUTHOR_EMAIL", "author@test.com")
-	os.Setenv("GOIT_COMMITTER_NAME", "Test Author")
-	os.Setenv("GOIT_COMMITTER_EMAIL", "author@test.com")
-	defer os.Unsetenv("GOIT_AUTHOR_NAME")
-	defer os.Unsetenv("GOIT_AUTHOR_EMAIL")
-	defer os.Unsetenv("GOIT_COMMITTER_NAME")
-	defer os.Unsetenv("GOIT_COMMITTER_EMAIL")
-
-	message := "Initial commit (no parent)"
-
-	commitHash, err := goit.CommitTree(emptyTreeHash, nil, message)
+	fileContent2 := []byte("test content v2")
+	err = os.WriteFile(fileName, fileContent2, 0644)
 	if err != nil {
-		t.Fatalf("CommitTree failed: %v", err)
+		t.Fatalf("Failed to write test file v2: %v", err)
 	}
 
-	_, contentBytes, err := goit.CatFile(commitHash)
+	err = index.Load()
 	if err != nil {
-		t.Fatalf("CatFile failed for commit hash %s: %v", commitHash, err)
+		t.Fatalf("Failed to reload index: %v", err)
 	}
-	content := string(contentBytes)
+	err = goit.AddPaths([]string{fileName}, index)
+	if err != nil {
+		t.Fatalf("AddPaths (2) failed: %v", err)
+	}
+	err = index.Save()
+	if err != nil {
+		t.Fatalf("SaveIndex (2) failed: %v", err)
+	}
 
-	if strings.Contains(content, "parent ") {
-		t.Errorf("Initial commit should not contain a parent line")
+	commitMsg2 := "Second commit"
+	commitHash2, _, err := goit.Commit(commitMsg2)
+	if err != nil {
+		t.Fatalf("goit.Commit (2) failed: %v", err)
 	}
-	if !strings.Contains(content, fmt.Sprintf("tree %s\n", emptyTreeHash)) {
-		t.Errorf("Commit missing correct tree hash line")
+	if commitHash1 == commitHash2 {
+		t.Errorf("Commit 2 hash is the same as Commit 1 hash")
+	}
+
+	headRef, err = goit.GetRefHash("refs/heads/main")
+	if err != nil {
+		t.Fatalf("Failed to read head ref after commit 2: %v", err)
+	}
+	if headRef != commitHash2 {
+		t.Errorf("HEAD ref content not updated to commit 2: got %s, want %s", headRef, commitHash2)
+	}
+
+	objType, contentBytes, err = goit.CatFile(commitHash2)
+	if err != nil {
+		t.Fatalf("CatFile failed for commit 2: %v", err)
+	}
+	if objType != "commit" {
+		t.Errorf("Expected object type 'commit', got '%s'", objType)
+	}
+	content2 := string(contentBytes)
+
+	expectedParentLine := fmt.Sprintf("parent %s", commitHash1)
+	if !strings.Contains(content2, expectedParentLine) {
+		t.Errorf("Commit 2 content missing correct parent line. Expected: '%s'\nGot:\n%s", expectedParentLine, content2)
+	}
+	if !strings.Contains(content2, commitMsg2) {
+		t.Errorf("Commit 2 content missing commit message")
 	}
 }
