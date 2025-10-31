@@ -15,20 +15,31 @@ import (
 const goitDir = ".goit"
 const objectsDir = "objects"
 
-func HashObject(filePath string, write bool) (string, error) {
+func CalculateHash(data []byte) string {
+	hashBytes := sha1.Sum(data)
+	return hex.EncodeToString(hashBytes[:])
+}
+
+func FormatObject(objType string, content []byte) []byte {
+	header := fmt.Sprintf("%s %d\000", objType, len(content))
+	return append([]byte(header), content...)
+}
+
+func HashObject(filePath string, write bool, objType string) (string, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("reading file %s: %w", filePath, err)
 	}
 
-	header := fmt.Sprintf("blob %d\000", len(content))
-	fullData := append([]byte(header), content...)
+	if objType == "" {
+		objType = "blob"
+	}
 
-	hash := sha1.Sum(fullData)
-	hashStr := hex.EncodeToString(hash[:])
+	fullData := FormatObject(objType, content)
+	hashStr := CalculateHash(fullData)
 
 	if write {
-		if err := writeObject(hashStr, fullData); err != nil {
+		if err := WriteObject(hashStr, fullData); err != nil {
 			return "", err
 		}
 	}
@@ -36,7 +47,7 @@ func HashObject(filePath string, write bool) (string, error) {
 	return hashStr, nil
 }
 
-func writeObject(hash string, data []byte) error {
+func WriteObject(hash string, data []byte) error {
 	objectDir := filepath.Join(goitDir, objectsDir, hash[:2])
 	objectPath := filepath.Join(objectDir, hash[2:])
 
@@ -52,21 +63,36 @@ func writeObject(hash string, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("creating object file %s: %w", objectPath, err)
 	}
-	defer file.Close()
+
+	fileClosed := false
+	defer func() {
+		if !fileClosed {
+			file.Close()
+		}
+	}()
 
 	zlibWriter := zlib.NewWriter(file)
-	defer zlibWriter.Close()
+	_, writeErr := zlibWriter.Write(data)
+	closeErr := zlibWriter.Close()
 
-	if _, err := zlibWriter.Write(data); err != nil {
-		return fmt.Errorf("compressing and writing object data: %w", err)
+	if writeErr != nil {
+		return fmt.Errorf("compressing and writing object data: %w", writeErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("closing zlib writer: %w", closeErr)
+	}
+
+	fileClosed = true
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("closing object file: %w", err)
 	}
 
 	return nil
 }
 
-func CatFile(hash string) ([]byte, error) {
+func ReadObject(hash string) ([]byte, error) {
 	if len(hash) != 40 {
-		return nil, fmt.Errorf("invalid hash length")
+		return nil, fmt.Errorf("invalid hash length: %d", len(hash))
 	}
 
 	objectPath := filepath.Join(goitDir, objectsDir, hash[:2], hash[2:])
@@ -88,31 +114,51 @@ func CatFile(hash string) ([]byte, error) {
 		return nil, fmt.Errorf("decompressing object data: %w", err)
 	}
 
-	nullByteIndex := bytes.IndexByte(decompressedData, 0)
+	return decompressedData, nil
+}
+
+func ParseObject(rawData []byte) (objType string, content []byte, err error) {
+	nullByteIndex := bytes.IndexByte(rawData, 0)
 	if nullByteIndex == -1 {
-		return nil, fmt.Errorf("invalid object format: missing null byte separator")
+		err = fmt.Errorf("invalid object format: missing null byte separator")
+		return "", nil, err
 	}
 
-	headerParts := bytes.SplitN(decompressedData[:nullByteIndex], []byte(" "), 2)
+	header := rawData[:nullByteIndex]
+	content = rawData[nullByteIndex+1:]
+
+	headerParts := bytes.SplitN(header, []byte(" "), 2)
 	if len(headerParts) != 2 {
-		return nil, fmt.Errorf("invalid object format: malformed header")
+		err = fmt.Errorf("invalid object format: malformed header '%s'", string(header))
+		return "", nil, err
 	}
 
-	objType := string(headerParts[0])
+	objType = string(headerParts[0])
 	sizeStr := string(headerParts[1])
-	expectedSize, err := strconv.Atoi(sizeStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid object format: non-integer size in header")
+	expectedSize, parseErr := strconv.Atoi(sizeStr)
+	if parseErr != nil {
+		err = fmt.Errorf("invalid object format: non-integer size '%s' in header", sizeStr)
+		return "", nil, err
 	}
 
-	content := decompressedData[nullByteIndex+1:]
 	if len(content) != expectedSize {
-		return nil, fmt.Errorf("invalid object format: actual size (%d) does not match header size (%d)", len(content), expectedSize)
+		err = fmt.Errorf("invalid object format: actual size (%d) does not match header size (%d)", len(content), expectedSize)
+		return "", nil, err
 	}
 
-	if objType != "blob" {
-		return nil, fmt.Errorf("unsupported object type: %s", objType)
+	return objType, content, nil
+}
+
+func CatFile(hash string) (objType string, content []byte, err error) {
+	rawData, err := ReadObject(hash)
+	if err != nil {
+		return "", nil, err
 	}
 
-	return content, nil
+	objType, content, err = ParseObject(rawData)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return objType, content, nil
 }

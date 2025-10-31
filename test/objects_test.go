@@ -51,7 +51,7 @@ func TestHashObjectWrite(t *testing.T) {
 	expectedHashBytes := sha1.Sum(fullData)
 	expectedHash := hex.EncodeToString(expectedHashBytes[:])
 
-	hash, err := goit.HashObject(fileName, true)
+	hash, err := goit.HashObject(fileName, true, "blob")
 	if err != nil {
 		t.Fatalf("HashObject failed: %v", err)
 	}
@@ -99,14 +99,18 @@ func TestCatFile(t *testing.T) {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	hash, err := goit.HashObject(fileName, true)
+	hash, err := goit.HashObject(fileName, true, "blob")
 	if err != nil {
 		t.Fatalf("HashObject failed during setup for CatFile: %v", err)
 	}
 
-	retrievedContent, err := goit.CatFile(hash)
+	objType, retrievedContent, err := goit.CatFile(hash)
 	if err != nil {
 		t.Fatalf("CatFile failed for hash %s: %v", hash, err)
+	}
+
+	if objType != "blob" {
+		t.Errorf("Expected object type 'blob', got '%s'", objType)
 	}
 
 	if !bytes.Equal(retrievedContent, fileContent) {
@@ -118,13 +122,13 @@ func TestCatFileInvalidHash(t *testing.T) {
 	cleanup := setupTestRepo(t)
 	defer cleanup()
 
-	_, err := goit.CatFile("invalidhash")
+	_, _, err := goit.CatFile("invalidhash")
 	if err == nil {
 		t.Error("Expected error for invalid hash length, but got nil")
 	}
 
 	nonExistentHash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	_, err = goit.CatFile(nonExistentHash)
+	_, _, err = goit.CatFile(nonExistentHash)
 	if err == nil {
 		t.Errorf("Expected error for non-existent hash %s, but got nil", nonExistentHash)
 	} else if !errors.Is(err, os.ErrNotExist) {

@@ -15,7 +15,7 @@ var catFileCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		objectHash := args[0]
-		content, err := goit.CatFile(objectHash)
+		_, content, err := goit.CatFile(objectHash)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return fmt.Errorf("fatal: Not a valid object name %s", objectHash)

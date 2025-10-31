@@ -151,7 +151,7 @@ func stageSingleFile(path string, stat os.FileInfo, index *Index) error {
 	headerForStorage := fmt.Sprintf("blob %d\000", len(content))
 	fullDataForStorage := append([]byte(headerForStorage), content...)
 
-	err = writeObject(finalHashStr, fullDataForStorage)
+	err = WriteObject(finalHashStr, fullDataForStorage)
 	if err != nil {
 		return fmt.Errorf("writing object for file %s: %w", path, err)
 	}

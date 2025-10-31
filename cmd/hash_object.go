@@ -16,7 +16,7 @@ var hashObjectCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
-		hash, err := goit.HashObject(filePath, writeObject)
+		hash, err := goit.HashObject(filePath, writeObject, "blob")
 		if err != nil {
 			return fmt.Errorf("hashing object %s: %w", filePath, err)
 		}
