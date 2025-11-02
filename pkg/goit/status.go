@@ -37,6 +37,11 @@ type StatusSummary struct {
 	Untracked []string
 }
 
+type TreeEntryInfo struct {
+	Mode uint32
+	Hash string
+}
+
 func GetStatus() (*StatusSummary, error) {
 	summary := &StatusSummary{
 		Staged:    make(map[string]StatusChangeType),
@@ -55,7 +60,7 @@ func GetStatus() (*StatusSummary, error) {
 	}
 	indexMap := index.Entries
 
-	workDirMap, err := scanWorkingDirectory(indexMap)
+	workDirMap, err := scanWorkingDirectory()
 	if err != nil {
 		return nil, fmt.Errorf("scanning working directory: %w", err)
 	}
@@ -72,7 +77,7 @@ func GetStatus() (*StatusSummary, error) {
 	}
 
 	for path := range allPaths {
-		headHash, inHead := headMap[path]
+		headEntry, inHead := headMap[path]
 		indexEntry, inIndex := indexMap[path]
 		workDirHash, inWorkDir := workDirMap[path]
 
@@ -93,7 +98,7 @@ func GetStatus() (*StatusSummary, error) {
 			stagedChange = ChangeStagedDeleted
 		} else if !inHead && inIndex {
 			stagedChange = ChangeStagedNew
-		} else if inHead && inIndex && headHash != indexHash {
+		} else if inHead && inIndex && headEntry.Hash != indexHash {
 			stagedChange = ChangeStagedModified
 		}
 
@@ -115,18 +120,13 @@ func GetStatus() (*StatusSummary, error) {
 	return summary, nil
 }
 
-func loadHeadTreeAsMap() (map[string]string, error) {
-	headRef, err := GetHeadRef()
-	if err != nil {
-		return nil, err
-	}
-
-	headHash, err := GetRefHash(headRef)
+func loadHeadTreeAsMap() (map[string]TreeEntryInfo, error) {
+	headHash, err := GetHeadCommitHash()
 	if err != nil {
 		return nil, err
 	}
 	if headHash == "" {
-		return make(map[string]string), nil
+		return make(map[string]TreeEntryInfo), nil
 	}
 
 	objType, content, err := CatFile(headHash)
@@ -142,11 +142,11 @@ func loadHeadTreeAsMap() (map[string]string, error) {
 		return nil, err
 	}
 
-	return flattenTree(commit.TreeHash, "")
+	return FlattenTree(commit.TreeHash, "")
 }
 
-func flattenTree(treeHash string, prefix string) (map[string]string, error) {
-	fileMap := make(map[string]string)
+func FlattenTree(treeHash string, prefix string) (map[string]TreeEntryInfo, error) {
+	fileMap := make(map[string]TreeEntryInfo)
 	if treeHash == "" {
 		return fileMap, nil
 	}
@@ -191,7 +191,7 @@ func flattenTree(treeHash string, prefix string) (map[string]string, error) {
 
 		isDir := (mode & 0040000) != 0
 		if isDir {
-			subMap, err := flattenTree(hashHex, fullPath+"/")
+			subMap, err := FlattenTree(hashHex, fullPath+"/")
 			if err != nil {
 				return nil, err
 			}
@@ -199,14 +199,17 @@ func flattenTree(treeHash string, prefix string) (map[string]string, error) {
 				fileMap[k] = v
 			}
 		} else {
-			fileMap[fullPath] = hashHex
+			fileMap[fullPath] = TreeEntryInfo{
+				Mode: uint32(mode),
+				Hash: hashHex,
+			}
 		}
 	}
 
 	return fileMap, nil
 }
 
-func scanWorkingDirectory(index map[string]*IndexEntry) (map[string]string, error) {
+func scanWorkingDirectory() (map[string]string, error) {
 	workDirMap := make(map[string]string)
 
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {

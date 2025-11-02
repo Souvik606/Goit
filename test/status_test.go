@@ -37,11 +37,12 @@ func addAll(t *testing.T) {
 	}
 }
 
-func commit(t *testing.T, message string) {
-	_, _, err := goit.Commit(message)
+func commit(t *testing.T, message string) (string, string, error) {
+	hash, ref, err := goit.Commit(message)
 	if err != nil {
 		t.Fatalf("Failed to commit '%s': %v", message, err)
 	}
+	return hash, ref, err
 }
 
 func TestStatusOnNewRepo(t *testing.T) {

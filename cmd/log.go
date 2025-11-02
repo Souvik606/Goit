@@ -8,6 +8,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	ColorYellow = "\x1b[33m"
+	ColorCyan   = "\x1b[36m"
+)
+
 var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "Show commit logs",
@@ -25,9 +30,9 @@ var logCmd = &cobra.Command{
 		}
 
 		for _, entry := range history {
-			fmt.Printf("commit %s\n", entry.Hash)
-			fmt.Printf("Author: %s\n", entry.Commit.AuthorLine)
-			fmt.Printf("Committer: %s\n", entry.Commit.CommitterLine)
+			fmt.Printf("%scommit %s%s\n", ColorYellow, entry.Hash, ColorReset)
+			fmt.Printf("Author: %s%s%s\n", ColorCyan, entry.Commit.AuthorLine, ColorReset)
+			fmt.Printf("Committer: %s%s%s\n", ColorCyan, entry.Commit.CommitterLine, ColorReset)
 
 			fmt.Println()
 
