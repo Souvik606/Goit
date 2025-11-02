@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"souvik606/goit/pkg/goit"
+	goit "souvik606/goit/pkg/goit/local"
+
 	"testing"
 )
 

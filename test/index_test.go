@@ -5,7 +5,7 @@ import (
 	"crypto/sha1"
 	"os"
 	"path/filepath"
-	"souvik606/goit/pkg/goit"
+	goit "souvik606/goit/pkg/goit/local"
 	"testing"
 	"time"
 )

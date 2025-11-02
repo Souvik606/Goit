@@ -2,7 +2,7 @@ package test
 
 import (
 	"os"
-	"souvik606/goit/pkg/goit"
+	goit "souvik606/goit/pkg/goit/local"
 	"strings"
 	"testing"
 )

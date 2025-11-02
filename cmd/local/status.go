@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"sort"
-	"souvik606/goit/pkg/goit"
+	goit "souvik606/goit/pkg/goit/local"
 	"strings"
 
 	"github.com/spf13/cobra"

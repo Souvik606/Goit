@@ -1,6 +1,6 @@
 package main
 
-import "souvik606/goit/cmd"
+import cmd "souvik606/goit/cmd/local"
 
 func main() {
 	cmd.Execute()
