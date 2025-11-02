@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -23,5 +23,5 @@ var writeTreeCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(writeTreeCmd)
+	RootCmd.AddCommand(writeTreeCmd)
 }

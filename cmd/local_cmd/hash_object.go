@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -27,5 +27,5 @@ var hashObjectCmd = &cobra.Command{
 
 func init() {
 	hashObjectCmd.Flags().BoolVarP(&writeObject, "write", "w", false, "Actually write the object into the database")
-	rootCmd.AddCommand(hashObjectCmd)
+	RootCmd.AddCommand(hashObjectCmd)
 }

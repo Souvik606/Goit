@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -46,5 +46,5 @@ var logCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(logCmd)
+	RootCmd.AddCommand(logCmd)
 }

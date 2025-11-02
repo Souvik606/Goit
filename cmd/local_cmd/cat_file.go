@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -32,5 +32,5 @@ var catFileCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(catFileCmd)
+	RootCmd.AddCommand(catFileCmd)
 }

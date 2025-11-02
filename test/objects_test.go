@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"souvik606/goit/pkg/goit"
+	goit "souvik606/goit/pkg/goit/local"
 
 	"io"
 	"os"
@@ -26,7 +26,7 @@ func setupTestRepo(t *testing.T) (cleanupFunc func()) {
 		t.Fatalf("Failed to change to temp dir: %v", err)
 	}
 
-	if err := goit.InitRepository(); err != nil {
+	if err := goit.InitRepository(false); err != nil {
 		t.Fatalf("Failed to initialize test repository: %v", err)
 	}
 

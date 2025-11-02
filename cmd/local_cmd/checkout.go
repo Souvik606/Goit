@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -27,5 +27,5 @@ updating the working directory and index to match.`,
 }
 
 func init() {
-	rootCmd.AddCommand(checkoutCmd)
+	RootCmd.AddCommand(checkoutCmd)
 }

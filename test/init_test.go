@@ -20,9 +20,9 @@ func TestInitRepository(t *testing.T) {
 		t.Fatalf("Failed to change to temp dir: %v", err)
 	}
 
-	err = goit.InitRepository()
+	err = goit.InitRepository(false)
 	if err != nil {
-		t.Fatalf("InitRepository() failed: %v", err)
+		t.Fatalf("InitRepository(false) failed: %v", err)
 	}
 
 	basePath := ".goit"
@@ -60,7 +60,7 @@ func TestInitRepository(t *testing.T) {
 		t.Errorf("HEAD content mismatch: got %q, want %q", string(content), expectedContent)
 	}
 
-	err = goit.InitRepository()
+	err = goit.InitRepository(false)
 	if err == nil {
 		t.Errorf("Expected error when re-initializing repository, but got nil")
 	}

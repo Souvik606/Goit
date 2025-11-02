@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -55,5 +55,5 @@ func createBranch(name string) error {
 }
 
 func init() {
-	rootCmd.AddCommand(branchCmd)
+	RootCmd.AddCommand(branchCmd)
 }

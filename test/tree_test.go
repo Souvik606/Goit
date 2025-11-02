@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"souvik606/goit/pkg/goit"
+	goit "souvik606/goit/pkg/goit/local"
 	"strings"
 	"testing"
 )

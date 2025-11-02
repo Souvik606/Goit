@@ -1,4 +1,4 @@
-package goit
+package local
 
 import (
 	"bytes"

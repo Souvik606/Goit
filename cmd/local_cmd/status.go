@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -91,5 +91,5 @@ func printStatusSection(title string, changes map[string]goit.StatusChangeType, 
 }
 
 func init() {
-	rootCmd.AddCommand(statusCmd)
+	RootCmd.AddCommand(statusCmd)
 }

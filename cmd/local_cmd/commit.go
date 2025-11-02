@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -36,5 +36,5 @@ var commitCmd = &cobra.Command{
 func init() {
 	commitCmd.Flags().StringVarP(&commitMsg, "message", "m", "", "Commit message(required)")
 	commitCmd.MarkFlagRequired("message")
-	rootCmd.AddCommand(commitCmd)
+	RootCmd.AddCommand(commitCmd)
 }

@@ -1,4 +1,4 @@
-package cmd
+package local_cmd
 
 import (
 	"fmt"
@@ -46,5 +46,5 @@ Outputs the hash of the new commit object. The commit message is taken from the 
 func init() {
 	commitTreeCmd.Flags().StringSliceVarP(&parentHashes, "parent", "p", nil, "Specify parent commit object hash (can be used multiple times)")
 	commitTreeCmd.Flags().StringVarP(&commitMessage, "message", "m", "", "Provide commit message")
-	rootCmd.AddCommand(commitTreeCmd)
+	RootCmd.AddCommand(commitTreeCmd)
 }
