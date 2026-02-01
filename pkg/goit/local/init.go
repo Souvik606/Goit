@@ -6,19 +6,28 @@ import (
 	"path/filepath"
 )
 
-func InitRepository(bare bool) error {
+const goitDir = ".goit"
+
+func InitRepository(rootPath string, bare bool) error {
 	var basePath string
 	if bare {
-		basePath = "."
+		basePath = rootPath
 	} else {
-		basePath = goitDir
+		basePath = filepath.Join(rootPath, goitDir)
 	}
 
-	if _, err := os.Stat(basePath); !os.IsNotExist(err) {
-		if basePath == "." {
-			return fmt.Errorf("repository already exists in current directory")
+	var checkPath string
+	if bare {
+		checkPath = filepath.Join(basePath, "HEAD")
+	} else {
+		checkPath = basePath
+	}
+
+	if _, err := os.Stat(checkPath); !os.IsNotExist(err) {
+		if bare {
+			return fmt.Errorf("repository already exists in %s (found HEAD file)", rootPath)
 		}
-		return fmt.Errorf("repository already exists")
+		return fmt.Errorf("repository already exists in %s", basePath)
 	}
 
 	if !bare {
@@ -28,7 +37,6 @@ func InitRepository(bare bool) error {
 	}
 
 	dirs := []string{"objects", "refs/heads", "refs/tags"}
-
 	for _, dir := range dirs {
 		if err := os.MkdirAll(filepath.Join(basePath, dir), 0755); err != nil {
 			return err
@@ -42,9 +50,36 @@ func InitRepository(bare bool) error {
 	}
 
 	configPath := filepath.Join(basePath, "config")
-	if err := os.WriteFile(configPath, []byte{}, 0644); err != nil {
+	configContent := []byte("[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n")
+	if bare {
+		configContent = append(configContent, []byte("\tbare = true\n")...)
+	} else {
+		configContent = append(configContent, []byte("\tbare = false\n")...)
+	}
+
+	if err := os.WriteFile(configPath, configContent, 0644); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func IsValidBareRepo(path string) bool {
+	if path == "" {
+		path = "."
+	}
+
+	headPath := filepath.Join(path, "HEAD")
+	if _, err := os.Stat(headPath); os.IsNotExist(err) {
+		return false
+	}
+	configPath := filepath.Join(path, "config")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return false
+	}
+	objectsPath := filepath.Join(path, "objects")
+	if _, err := os.Stat(objectsPath); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

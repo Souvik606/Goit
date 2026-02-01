@@ -26,7 +26,7 @@ func setupTestRepo(t *testing.T) (cleanupFunc func()) {
 		t.Fatalf("Failed to change to temp dir: %v", err)
 	}
 
-	if err := goit.InitRepository(false); err != nil {
+	if err := goit.InitRepository(tempDir, false); err != nil {
 		t.Fatalf("Failed to initialize test repository: %v", err)
 	}
 

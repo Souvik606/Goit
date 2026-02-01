@@ -12,8 +12,14 @@ import (
 	"strconv"
 )
 
-const goitDir = ".goit"
 const objectsDir = "objects"
+
+func GetObjectPath(hash string) string {
+	if IsValidBareRepo(".") {
+		return filepath.Join(objectsDir, hash[:2], hash[2:])
+	}
+	return filepath.Join(goitDir, objectsDir, hash[:2], hash[2:])
+}
 
 func CalculateHash(data []byte) string {
 	hashBytes := sha1.Sum(data)
@@ -62,8 +68,8 @@ func HashObject(filePath string, write bool, objType string) (string, error) {
 }
 
 func WriteObject(hash string, data []byte) error {
-	objectDir := filepath.Join(goitDir, objectsDir, hash[:2])
-	objectPath := filepath.Join(objectDir, hash[2:])
+	objectPath := GetObjectPath(hash)
+	objectDir := filepath.Dir(objectPath)
 
 	if _, err := os.Stat(objectPath); err == nil {
 		return nil
@@ -108,7 +114,7 @@ func ReadObject(hash string) ([]byte, error) {
 		return nil, fmt.Errorf("invalid hash length: %d", len(hash))
 	}
 
-	objectPath := filepath.Join(goitDir, objectsDir, hash[:2], hash[2:])
+	objectPath := GetObjectPath(hash)
 
 	file, err := os.Open(objectPath)
 	if err != nil {

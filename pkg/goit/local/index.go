@@ -21,10 +21,9 @@ type IndexHeader struct {
 }
 
 type IndexEntry struct {
-	Mode uint32
-	Hash [sha1.Size]byte
-	Path string
-
+	Mode         uint32
+	Hash         [sha1.Size]byte
+	Path         string
 	MTimeSeconds int64
 	MTimeNanos   int64
 	Size         uint64
@@ -41,6 +40,9 @@ func NewIndex() *Index {
 }
 
 func getIndexPath() string {
+	if IsValidBareRepo(".") {
+		return "index"
+	}
 	return filepath.Join(goitDir, "index")
 }
 
@@ -97,15 +99,22 @@ func (idx *Index) Load() error {
 	}
 
 	if len(remainingContent) < sha1.Size {
-		if header.EntryCount > 0 || len(remainingContent) != sha1.Size {
+		if header.EntryCount > 0 || (header.EntryCount == 0 && len(remainingContent) != sha1.Size) {
 			return fmt.Errorf("index file is corrupted or incomplete after header")
-		}
-		if header.EntryCount == 0 && len(remainingContent) == sha1.Size {
 		}
 	}
 
-	contentToChecksum := append(headerBytes, remainingContent[:len(remainingContent)-sha1.Size]...)
-	expectedChecksumBytes := remainingContent[len(remainingContent)-sha1.Size:]
+	var contentToChecksum []byte
+	var expectedChecksumBytes []byte
+	if len(remainingContent) >= sha1.Size {
+		contentToChecksum = append(headerBytes, remainingContent[:len(remainingContent)-sha1.Size]...)
+		expectedChecksumBytes = remainingContent[len(remainingContent)-sha1.Size:]
+	} else if len(remainingContent) == 0 && header.EntryCount == 0 {
+		return nil
+	} else {
+		return fmt.Errorf("index file content too short for checksum validation")
+	}
+
 	actualChecksumBytes := sha1.Sum(contentToChecksum)
 
 	if !bytes.Equal(expectedChecksumBytes, actualChecksumBytes[:]) {
@@ -250,7 +259,6 @@ func (idx *Index) AddOrUpdateEntry(path string, hash [sha1.Size]byte, mode uint3
 		MTimeNanos:   int64(stat.ModTime().Nanosecond()),
 		Size:         uint64(stat.Size()),
 	}
-
 	if idx.Entries == nil {
 		idx.Entries = make(map[string]*IndexEntry)
 	}

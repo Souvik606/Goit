@@ -14,10 +14,12 @@ var (
 )
 
 func getRefPath(ref string) string {
+	if IsValidBareRepo(".") {
+		return strings.ReplaceAll(ref, "\\", "/")
+	}
 	ref = strings.ReplaceAll(ref, "\\", "/")
 	return filepath.Join(goitDir, ref)
 }
-
 func GetHeadRef() (string, error) {
 	headPath := getRefPath("HEAD")
 	content, err := os.ReadFile(headPath)
