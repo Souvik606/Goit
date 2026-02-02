@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"souvik606/goit/pkg/goit/local"
@@ -35,8 +36,6 @@ type GetObjectsRequest struct {
 }
 
 func (s *GoitServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("DEBUG(Server): Received request: %s %s\n", r.Method, r.URL.Path)
-
 	parts := strings.SplitN(strings.Trim(r.URL.Path, "/"), "/", 2)
 	if len(parts) < 1 || parts[0] == "" {
 		http.Error(w, "Invalid request path", http.StatusBadRequest)
@@ -47,7 +46,6 @@ func (s *GoitServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	repoPath := filepath.Join(s.BasePath, repoName)
 
 	if !local.IsValidBareRepo(repoPath) {
-		fmt.Printf("DEBUG(Server): Repo not found or not bare: %s\n", repoPath)
 		http.Error(w, "Repository not found or not a bare repository", http.StatusNotFound)
 		return
 	}
@@ -58,7 +56,6 @@ func (s *GoitServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	action := parts[1]
-	fmt.Printf("DEBUG(Server): Routing action '%s' for repo '%s'\n", action, repoName)
 
 	originalWd, err := os.Getwd()
 	if err != nil {
@@ -76,6 +73,8 @@ func (s *GoitServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleInfoRefs(w, r)
 	case "get-objects":
 		s.handleGetObjects(w, r)
+	case "receive-pack":
+		handleReceivePack(w, r, repoPath)
 	default:
 		http.Error(w, "Action not supported", http.StatusNotFound)
 	}
@@ -126,7 +125,7 @@ func (s *GoitServer) handleInfoRefs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		fmt.Printf("DEBUG(Server): Failed to encode response (client likely disconnected): %v\n", err) // #changed
+		fmt.Printf("Failed to encode response (client likely disconnected): %v\n", err)
 	}
 }
 
@@ -165,31 +164,110 @@ func (s *GoitServer) handleGetObjects(w http.ResponseWriter, r *http.Request) {
 		objectPath := local.GetObjectPath(hash)
 		file, err := os.Open(objectPath)
 		if err != nil {
-			fmt.Printf("DEBUG(Server): Could not open object %s: %v\n", objectPath, err)
 			continue
 		}
 		defer file.Close()
 
 		stat, err := file.Stat()
 		if err != nil {
-			fmt.Printf("DEBUG(Server): Could not stat object %s: %v\n", objectPath, err)
 			continue
 		}
 
 		hdr := &tar.Header{
-			Name: filepath.Join(hash[:2], hash[2:]),
+			Name: path.Join(hash[:2], hash[2:]),
 			Size: stat.Size(),
 			Mode: 0644,
 		}
+
 		if err := tw.WriteHeader(hdr); err != nil {
-			fmt.Printf("DEBUG(Server): Failed to write tar header for %s: %v\n", hash, err)
 			return
 		}
 		if _, err := io.Copy(tw, file); err != nil {
-			fmt.Printf("DEBUG(Server): Failed to write object %s to tar: %v\n", hash, err)
 			return
 		}
 	}
+}
+
+func handleReceivePack(w http.ResponseWriter, r *http.Request, repoPath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	refName := r.URL.Query().Get("ref")
+	oldHash := r.URL.Query().Get("old")
+	newHash := r.URL.Query().Get("new")
+
+	if refName == "" || newHash == "" {
+		http.Error(w, "Missing 'ref' or 'new' parameters", http.StatusBadRequest)
+		return
+	}
+
+	currentHash, err := local.ResolveRef(filepath.Join(repoPath, ".goit"), refName)
+	if err != nil {
+		if !os.IsNotExist(err) && oldHash != "" && oldHash != "0000000000000000000000000000000000000000" {
+			// In a real system, we'd error here. For this simplified version, we proceed if it's a new branch.
+		}
+	} else {
+		if currentHash != oldHash {
+			http.Error(w, fmt.Sprintf("Rejecting push: remote ref has changed (expected %s, got %s)", oldHash, currentHash), http.StatusConflict)
+			return
+		}
+	}
+
+	gr, err := gzip.NewReader(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to create gzip reader", http.StatusBadRequest)
+		return
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	objectsDir := filepath.Join(repoPath, "objects")
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			http.Error(w, "Failed to read tar stream", http.StatusInternalServerError)
+			return
+		}
+
+		targetPath := filepath.Join(objectsDir, header.Name)
+		if !strings.HasPrefix(targetPath, filepath.Clean(objectsDir)) {
+			http.Error(w, "Illegal file path in tar", http.StatusBadRequest)
+			return
+		}
+
+		if header.Typeflag == tar.TypeReg {
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+				http.Error(w, "Failed to create object directory", http.StatusInternalServerError)
+				return
+			}
+
+			f, err := os.Create(targetPath)
+			if err != nil {
+				http.Error(w, "Failed to write object file", http.StatusInternalServerError)
+				return
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				http.Error(w, "Failed to write object content", http.StatusInternalServerError)
+				return
+			}
+			f.Close()
+		}
+	}
+
+	if err := local.UpdateRefRaw(repoPath, refName, newHash); err != nil {
+		http.Error(w, "Failed to update ref: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Push accepted: %s updated to %s", refName, newHash)
 }
 
 func Serve(basePath string, port string) error {

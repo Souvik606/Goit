@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"souvik606/goit/pkg/goit/local"
 	"strings"
@@ -78,6 +79,7 @@ func UnpackObjects(tarballStream io.ReadCloser) error {
 		}
 
 		destPath := filepath.Join(goitDir, objectsDir, header.Name)
+
 		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 			return fmt.Errorf("creating object dir %s: %w", filepath.Dir(destPath), err)
 		}
@@ -152,6 +154,7 @@ func GoitFetch(remoteName string) (*InfoRefsResponse, error) {
 	for ref, hash := range infoRefs.Refs {
 		if strings.HasPrefix(ref, "refs/heads/") {
 			localRef := strings.Replace(ref, "refs/heads/", "refs/remotes/"+remoteName+"/", 1)
+
 			if err := local.UpdateRef(localRef, hash); err != nil {
 				return nil, fmt.Errorf("updating remote ref %s: %w", localRef, err)
 			}
@@ -234,14 +237,132 @@ func GoitClone(cloneURL string, directory string) error {
 		return fmt.Errorf("remote HEAD points to %s but that ref was not found in remote refs", defaultBranchRef)
 	}
 
+	fmt.Printf("Checking out default branch '%s'\n", defaultBranchName)
+
+	if _, err := local.Checkout(defaultBranchHash); err != nil {
+		return fmt.Errorf("failed to checkout default branch '%s': %w", defaultBranchHash, err)
+	}
+
 	if err := local.UpdateRef("refs/heads/"+defaultBranchName, defaultBranchHash); err != nil {
 		return fmt.Errorf("failed to create local branch '%s': %w", defaultBranchName, err)
 	}
 
-	fmt.Printf("Checking out default branch '%s'\n", defaultBranchName)
-	if _, err := local.Checkout(defaultBranchName); err != nil {
-		return fmt.Errorf("failed to checkout default branch '%s': %w", defaultBranchName, err)
+	if err := local.UpdateHead("refs/heads/"+defaultBranchName, ""); err != nil {
+		return fmt.Errorf("failed to update HEAD to branch '%s': %w", defaultBranchName, err)
 	}
 
+	return nil
+}
+
+func GoitPush(remoteName, branchName string) error {
+	cfg, err := ReadConfig()
+	if err != nil {
+		return err
+	}
+
+	remoteURL, ok := cfg[fmt.Sprintf("remote \"%s\"", remoteName)]["url"]
+	if !ok {
+		return fmt.Errorf("remote '%s' not found", remoteName)
+	}
+
+	localRefPath := "refs/heads/" + branchName
+	localHash, err := local.ResolveRef(".goit", localRefPath)
+	if err != nil {
+		return fmt.Errorf("branch '%s' does not exist locally", branchName)
+	}
+
+	infoRefs, err := FetchInfoRefs(remoteURL)
+	if err != nil {
+		return fmt.Errorf("failed to contact remote: %w", err)
+	}
+
+	remoteHash := infoRefs.Refs[localRefPath]
+	if remoteHash == "" {
+		remoteHash = "0000000000000000000000000000000000000000"
+	}
+
+	if localHash == remoteHash {
+		fmt.Println("Everything up-to-date")
+		return nil
+	}
+
+	commitsToSync, err := FindCommitsToSync([]string{localHash}, []string{remoteHash})
+	if err != nil {
+		return fmt.Errorf("calculating push list: %w", err)
+	}
+
+	if len(commitsToSync) == 0 {
+		fmt.Println("Everything up-to-date (No new commits found)")
+		return nil
+	}
+
+	fmt.Printf("Pushing %d commits to %s...\n", len(commitsToSync), remoteURL)
+
+	objectsToPack, err := FindRequiredObjects(commitsToSync)
+	if err != nil {
+		return fmt.Errorf("preparing objects: %w", err)
+	}
+
+	var allHashes []string
+	for hash := range commitsToSync {
+		allHashes = append(allHashes, hash)
+	}
+	for hash := range objectsToPack {
+		allHashes = append(allHashes, hash)
+	}
+
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	for _, hash := range allHashes {
+		objPath := filepath.Join(".goit", "objects", hash[:2], hash[2:])
+		f, err := os.Open(objPath)
+		if err != nil {
+			fmt.Printf("Warning: failed to read object %s: %v\n", hash, err)
+			continue
+		}
+
+		stat, _ := f.Stat()
+		hdr := &tar.Header{
+			Name: path.Join(hash[:2], hash[2:]),
+			Size: stat.Size(),
+			Mode: 0644,
+		}
+		if err := tw.WriteHeader(hdr); err == nil {
+			io.Copy(tw, f)
+		}
+		f.Close()
+	}
+
+	tw.Close()
+	gw.Close()
+
+	reqURL := fmt.Sprintf("%s/receive-pack?ref=%s&old=%s&new=%s",
+		strings.TrimSuffix(remoteURL, "/"),
+		localRefPath,
+		remoteHash,
+		localHash,
+	)
+
+	req, err := http.NewRequest("POST", reqURL, &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-tar")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("push failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("server rejected push: %s", string(body))
+	}
+
+	fmt.Println("Push successful.")
 	return nil
 }

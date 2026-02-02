@@ -128,6 +128,25 @@ func ResolveTarget(target string) (hash string, refPath string, err error) {
 	return "", "", fmt.Errorf("fatal: '%s' is not a commit and a branch '%s' cannot be created from it", target, target)
 }
 
+func ResolveRef(goitDir, refName string) (string, error) {
+	refPath := filepath.Join(goitDir, refName)
+
+	data, err := os.ReadFile(refPath)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(data)), nil
+}
+
+func UpdateRefRaw(repoRoot, refName, hash string) error {
+	refPath := filepath.Join(repoRoot, refName)
+	if err := os.MkdirAll(filepath.Dir(refPath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(refPath, []byte(hash+"\n"), 0644)
+}
+
 func ListBranches() (branches []string, activeBranch string, err error) {
 	headsDir := getRefPath("refs/heads")
 
