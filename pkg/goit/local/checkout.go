@@ -128,8 +128,6 @@ func CleanWorkingDirectory(currentIndexEntries map[string]*IndexEntry, targetTre
 
 func RestoreWorkingDirectory(targetTree map[string]TreeEntryInfo) error {
 	for path, entry := range targetTree {
-		fmt.Printf("DEBUG(Checkout): Attempting to restore: '%s' with Hash: %s\n", path, entry.Hash)
-
 		dir := filepath.Dir(path)
 		if dir != "." {
 			if err := os.MkdirAll(dir, 0755); err != nil {
