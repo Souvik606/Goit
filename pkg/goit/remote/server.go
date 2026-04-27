@@ -203,16 +203,11 @@ func handleReceivePack(w http.ResponseWriter, r *http.Request, repoPath string) 
 		return
 	}
 
-	currentHash, err := local.ResolveRef(filepath.Join(repoPath, ".goit"), refName)
+	currentHash, err := local.ResolveRef(".", refName)
 	if err != nil {
-		if !os.IsNotExist(err) && oldHash != "" && oldHash != "0000000000000000000000000000000000000000" {
-			// In a real system, we'd error here. For this simplified version, we proceed if it's a new branch.
-		}
-	} else {
-		if currentHash != oldHash {
-			http.Error(w, fmt.Sprintf("Rejecting push: remote ref has changed (expected %s, got %s)", oldHash, currentHash), http.StatusConflict)
-			return
-		}
+	} else if currentHash != oldHash {
+		http.Error(w, "Rejecting push: remote ref has changed", http.StatusConflict)
+		return
 	}
 
 	gr, err := gzip.NewReader(r.Body)
@@ -223,7 +218,8 @@ func handleReceivePack(w http.ResponseWriter, r *http.Request, repoPath string) 
 	defer gr.Close()
 
 	tr := tar.NewReader(gr)
-	objectsDir := filepath.Join(repoPath, "objects")
+
+	objectsDir := "objects"
 
 	for {
 		header, err := tr.Next()
@@ -236,10 +232,6 @@ func handleReceivePack(w http.ResponseWriter, r *http.Request, repoPath string) 
 		}
 
 		targetPath := filepath.Join(objectsDir, header.Name)
-		if !strings.HasPrefix(targetPath, filepath.Clean(objectsDir)) {
-			http.Error(w, "Illegal file path in tar", http.StatusBadRequest)
-			return
-		}
 
 		if header.Typeflag == tar.TypeReg {
 			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
@@ -252,16 +244,12 @@ func handleReceivePack(w http.ResponseWriter, r *http.Request, repoPath string) 
 				http.Error(w, "Failed to write object file", http.StatusInternalServerError)
 				return
 			}
-			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
-				http.Error(w, "Failed to write object content", http.StatusInternalServerError)
-				return
-			}
+			io.Copy(f, tr)
 			f.Close()
 		}
 	}
 
-	if err := local.UpdateRefRaw(repoPath, refName, newHash); err != nil {
+	if err := local.UpdateRefRaw(".", refName, newHash); err != nil {
 		http.Error(w, "Failed to update ref: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

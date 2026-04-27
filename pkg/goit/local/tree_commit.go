@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -220,7 +221,19 @@ func Commit(message string) (string, string, error) {
 
 	var parentHashes []string
 	if parentHash != "" {
-		parentHashes = []string{parentHash}
+		parentHashes = append(parentHashes, parentHash)
+	}
+
+	mergeHeadPath := filepath.Join(goitDir, "MERGE_HEAD")
+	mergeHeadBytes, err := os.ReadFile(mergeHeadPath)
+	isMergeCommit := false
+
+	if err == nil {
+		mergeHash := strings.TrimSpace(string(mergeHeadBytes))
+		if len(mergeHash) == 40 {
+			parentHashes = append(parentHashes, mergeHash)
+			isMergeCommit = true
+		}
 	}
 
 	newCommitHash, err := CommitTree(treeHash, parentHashes, message)
@@ -230,6 +243,10 @@ func Commit(message string) (string, string, error) {
 
 	if err := UpdateRef(headRefPath, newCommitHash); err != nil {
 		return "", "", fmt.Errorf("failed to update HEAD ref %s: %w", headRefPath, err)
+	}
+
+	if isMergeCommit {
+		os.Remove(mergeHeadPath)
 	}
 
 	return newCommitHash, headRefPath, nil

@@ -117,6 +117,14 @@ func ResolveTarget(target string) (hash string, refPath string, err error) {
 		return target, "", nil
 	}
 
+	if strings.HasPrefix(target, "refs/") {
+		fullPath := getRefPath(target)
+		if _, err := os.Stat(fullPath); err == nil {
+			hash, err := GetRefHash(target)
+			return hash, target, err
+		}
+	}
+
 	refPath = "refs/heads/" + target
 	fullPath := getRefPath(refPath)
 
