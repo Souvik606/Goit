@@ -16,6 +16,11 @@ func AddPaths(paths []string, index *Index) error {
 		return fmt.Errorf("no paths specified for add")
 	}
 
+	ignoreRules, err := ReadIgnoreFile()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not read .goitignore: %v\n", err)
+	}
+
 	fullScan := false
 	specificPaths := make(map[string]bool)
 	for _, p := range paths {
@@ -28,7 +33,7 @@ func AddPaths(paths []string, index *Index) error {
 	}
 
 	if fullScan {
-		touchedPaths, err := scanAndStageDirectory(".", index)
+		touchedPaths, err := scanAndStageDirectory(".", index, ignoreRules)
 		if err != nil {
 			return fmt.Errorf("scanning working directory: %w", err)
 		}
@@ -52,8 +57,14 @@ func AddPaths(paths []string, index *Index) error {
 				return fmt.Errorf("stat path %s: %w", path, err)
 			}
 
+			normalizedPath := filepath.ToSlash(path)
+			if IsIgnored(ignoreRules, normalizedPath, stat.IsDir()) {
+				fmt.Fprintf(os.Stderr, "The following paths are ignored by one of your .goitignore files:\n%s\n", path)
+				continue
+			}
+
 			if stat.IsDir() {
-				dirTouched, err := scanAndStageDirectory(path, index)
+				dirTouched, err := scanAndStageDirectory(path, index, ignoreRules)
 				if err != nil {
 					return fmt.Errorf("scanning directory %s: %w", path, err)
 				}
@@ -73,7 +84,7 @@ func AddPaths(paths []string, index *Index) error {
 	return nil
 }
 
-func scanAndStageDirectory(dirPath string, index *Index) (map[string]bool, error) {
+func scanAndStageDirectory(dirPath string, index *Index, ignoreRules []IgnoreRule) (map[string]bool, error) {
 	touchedPaths := make(map[string]bool)
 
 	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
@@ -86,6 +97,13 @@ func scanAndStageDirectory(dirPath string, index *Index) (map[string]bool, error
 		}
 
 		normalizedPath := filepath.ToSlash(path)
+
+		if IsIgnored(ignoreRules, normalizedPath, d.IsDir()) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
 		if d.IsDir() && normalizedPath == goitDir {
 			return filepath.SkipDir

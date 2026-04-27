@@ -255,7 +255,7 @@ func TestPush(t *testing.T) {
 		t.Fatalf("Chdir client failed: %v", err)
 	}
 
-	config, err := remote.ReadConfig()
+	config, err := local.ReadConfig()
 	if err != nil {
 		t.Fatalf("ReadConfig failed: %v", err)
 	}

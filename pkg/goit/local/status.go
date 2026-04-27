@@ -49,6 +49,8 @@ func GetStatus() (*StatusSummary, error) {
 		Untracked: make([]string, 0),
 	}
 
+	ignoreRules, _ := ReadIgnoreFile()
+
 	headMap, err := loadHeadTreeAsMap()
 	if err != nil {
 		return nil, fmt.Errorf("loading HEAD tree: %w", err)
@@ -60,7 +62,7 @@ func GetStatus() (*StatusSummary, error) {
 	}
 	indexMap := index.Entries
 
-	workDirMap, err := scanWorkingDirectory()
+	workDirMap, err := scanWorkingDirectory(ignoreRules)
 	if err != nil {
 		return nil, fmt.Errorf("scanning working directory: %w", err)
 	}
@@ -209,7 +211,7 @@ func FlattenTree(treeHash string, prefix string) (map[string]TreeEntryInfo, erro
 	return fileMap, nil
 }
 
-func scanWorkingDirectory() (map[string]string, error) {
+func scanWorkingDirectory(ignoreRules []IgnoreRule) (map[string]string, error) {
 	workDirMap := make(map[string]string)
 
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
@@ -223,6 +225,13 @@ func scanWorkingDirectory() (map[string]string, error) {
 			return nil
 		}
 
+		if IsIgnored(ignoreRules, normalizedPath, d.IsDir()) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		if d.IsDir() && normalizedPath == goitDir {
 			return filepath.SkipDir
 		}
@@ -230,7 +239,7 @@ func scanWorkingDirectory() (map[string]string, error) {
 			return nil
 		}
 		baseName := filepath.Base(normalizedPath)
-		if strings.HasPrefix(baseName, ".") && baseName != ".goignore" {
+		if strings.HasPrefix(baseName, ".") && baseName != ".goitignore" {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}

@@ -156,14 +156,29 @@ func CommitTree(treeHash string, parentHashes []string, message string) (string,
 		return "", fmt.Errorf("commit message cannot be empty")
 	}
 
-	//TODO: To be replaced latter with real logic
-	authorName := os.Getenv("GOIT_AUTHOR_NAME")
-	if authorName == "" {
-		authorName = "Default Author"
+	config, err := ReadConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to read config: %w", err)
 	}
-	authorEmail := os.Getenv("GOIT_AUTHOR_EMAIL")
+	authorName := ""
+	authorEmail := ""
+	if userSec, ok := config["user"]; ok {
+		authorName = userSec["name"]
+		authorEmail = userSec["email"]
+	}
+
+	if authorName == "" {
+		authorName = os.Getenv("GOIT_AUTHOR_NAME")
+		if authorName == "" {
+			return "", fmt.Errorf("\n*** Please tell me who you are.\n\nRun\n  goit config user.email \"you@example.com\"\n  goit config user.name \"Your Name\"\n\nto set your account's default identity.\nfatal: empty ident name not allowed")
+		}
+	}
+
 	if authorEmail == "" {
-		authorEmail = "author@example.com"
+		authorEmail = os.Getenv("GOIT_AUTHOR_EMAIL")
+		if authorEmail == "" {
+			return "", fmt.Errorf("fatal: empty ident email not allowed")
+		}
 	}
 
 	committerName := os.Getenv("GOIT_COMMITTER_NAME")
@@ -195,7 +210,7 @@ func CommitTree(treeHash string, parentHashes []string, message string) (string,
 
 	fullData := FormatObject("commit", content.Bytes())
 	hashStr := CalculateHash(fullData)
-	err := WriteObject(hashStr, fullData)
+	err = WriteObject(hashStr, fullData)
 	if err != nil {
 		return "", fmt.Errorf("writing commit object: %w", err)
 	}

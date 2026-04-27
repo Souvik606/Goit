@@ -3,7 +3,7 @@ package remote_cmd
 import (
 	"fmt"
 	"souvik606/goit/cmd/local_cmd"
-	goit "souvik606/goit/pkg/goit/remote"
+	local "souvik606/goit/pkg/goit/local"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +23,7 @@ var remoteAddCmd = &cobra.Command{
 		name := args[0]
 		url := args[1]
 
-		config, err := goit.ReadConfig()
+		config, err := local.ReadConfig()
 		if err != nil {
 			return fmt.Errorf("reading config: %w", err)
 		}

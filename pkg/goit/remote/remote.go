@@ -16,6 +16,8 @@ import (
 	"strings"
 )
 
+const goitDir = ".goit"
+
 func FetchInfoRefs(url string) (*InfoRefsResponse, error) {
 	resp, err := http.Get(url + "/info/refs")
 	if err != nil {
@@ -99,7 +101,7 @@ func UnpackObjects(tarballStream io.ReadCloser) error {
 }
 
 func GoitFetch(remoteName string) (*InfoRefsResponse, error) {
-	config, err := ReadConfig()
+	config, err := local.ReadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
@@ -198,7 +200,7 @@ func GoitClone(cloneURL string, directory string) error {
 		return fmt.Errorf("initializing repository in %s: %w", directory, err)
 	}
 
-	config, err := ReadConfig()
+	config, err := local.ReadConfig()
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}
@@ -255,7 +257,7 @@ func GoitClone(cloneURL string, directory string) error {
 }
 
 func GoitPush(remoteName, branchName string) error {
-	cfg, err := ReadConfig()
+	cfg, err := local.ReadConfig()
 	if err != nil {
 		return err
 	}

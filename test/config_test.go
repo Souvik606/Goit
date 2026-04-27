@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	goit "souvik606/goit/pkg/goit/local"
-	remote "souvik606/goit/pkg/goit/remote"
 	"strings"
 	"testing"
 )
@@ -14,7 +13,7 @@ func TestReadWriteConfig(t *testing.T) {
 	cleanup := setupTestRepo(t)
 	defer cleanup()
 
-	config, err := remote.ReadConfig()
+	config, err := goit.ReadConfig()
 	if err != nil {
 		t.Fatalf("ReadConfig (initial) failed: %v", err)
 	}
@@ -28,7 +27,7 @@ func TestReadWriteConfig(t *testing.T) {
 		t.Fatalf("config.Save failed: %v", err)
 	}
 
-	loadedConfig, err := remote.ReadConfig()
+	loadedConfig, err := goit.ReadConfig()
 	if err != nil {
 		t.Fatalf("ReadConfig (after save) failed: %v", err)
 	}
@@ -58,7 +57,7 @@ func TestConfigFindsRepoRoot(t *testing.T) {
 		t.Fatalf("Failed to cd to sub-directory: %v", err)
 	}
 
-	config, err := remote.ReadConfig()
+	config, err := goit.ReadConfig()
 	if err != nil {
 		t.Fatalf("ReadConfig from sub-directory failed: %v", err)
 	}
@@ -79,7 +78,7 @@ func TestReadConfigNotExist(t *testing.T) {
 	}
 	defer os.Chdir(originalWd)
 
-	_, err = remote.ReadConfig()
+	_, err = goit.ReadConfig()
 	if err == nil {
 		t.Fatalf("Expected ReadConfig to fail in non-repo dir, but it did not")
 	}
@@ -108,7 +107,7 @@ func TestGetConfigPathInBareRepo(t *testing.T) {
 		t.Fatalf("InitRepository(true) failed: %v", err)
 	}
 
-	config, err := remote.ReadConfig()
+	config, err := goit.ReadConfig()
 	if err != nil {
 		t.Fatalf("ReadConfig failed in bare repo: %v", err)
 	}

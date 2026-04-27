@@ -1,4 +1,4 @@
-package remote
+package local
 
 import (
 	"bufio"
@@ -6,13 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"souvik606/goit/pkg/goit/local"
 	"strings"
 )
 
 type Config map[string]map[string]string
-
-const goitDir = ".goit"
 
 func findGoitDir(path string) (string, error) {
 	parent := filepath.Dir(path)
@@ -30,7 +27,7 @@ func findGoitDir(path string) (string, error) {
 
 	configPath := filepath.Join(path, "config")
 	if _, err := os.Stat(configPath); err == nil {
-		if local.IsValidBareRepo(path) {
+		if IsValidBareRepo(path) {
 			return path, nil
 		}
 	}
