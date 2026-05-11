@@ -73,46 +73,82 @@ goit
 goit help
 ```
 
-## Hosting Your Own Goit Server (Acting as GitHub)
+## Complete Guide: Hosting and Collaborating with Goit
 
-Because Goit is a distributed system, it includes a built-in HTTP server that allows you to easily host your own centralized remote repositories—acting exactly like a self-hosted GitHub.
+Because Goit is a true Distributed Version Control System, it includes a built-in HTTP server to handle network synchronization. This guide will walk you through setting up a central server and demonstrating how two different developers (User A and User B) can collaborate on the same repository.
 
-### Step 1: Create a Bare Repository on the Server
-A "bare" repository is a special type of repository that doesn't have a working directory. It only stores the version control database, making it perfect for acting as a central hub.
+### Phase 1: Setting up the Central Server
+First, we need to create a "bare" repository to act as our central hub (similar to a GitHub repository) and start the Goit HTTP server to listen for network requests.
 
 ```bash
-# Create a folder for your central repositories
-mkdir -p /path/to/server-repos/my-project.git
-cd /path/to/server-repos/my-project.git
+# 1. Create a directory to hold your server repositories
+mkdir -p /path/to/server-repos/test-repo
+cd /path/to/server-repos/test-repo
 
-# Initialize it as a bare repository
+# 2. Initialize it as a bare repository (no working directory)
 goit init --bare
-```
-### Step 2: Start the Goit Server
-Run the built-in HTTP server and point it to the root directory where your bare repositories live (the folder containing my-project.git).
 
-```bash
+# 3. Start the Goit HTTP server in the parent directory
 cd /path/to/server-repos
-goit serve -p 8080
+goit serve -p 8080 .
 ```
 
-Your Goit server is now live at http://localhost:8080!
+The Goit server is now live at http://localhost:8080 and listening for connections.
 
-### Step 3: Connect from a Client Machine
-Now, developers can clone, push, and pull from this central server across the network.
+### Phase 2: User A Initializes and Pushes Code
+User A wants to start working on the project, link it to the central server, and push the very first commit.
 
-# Clone the repository to a local machine
 ```bash
-goit clone http://localhost:8080/my-project.git client-workspace
-cd client-workspace
-```
+# 1. User A creates a local workspace
+mkdir ~/user-a-workspace
+cd ~/user-a-workspace
 
-# Make changes and push back to the server
-```bash
-echo "Hello from the client!" > test.txt
+# 2. Initialize a standard Goit repository
+goit init
+
+# 3. Create some initial files
+echo "Hello from User A" > main.txt
 goit add .
-goit commit -m "First commit to the server"
+goit commit -m "Initial commit by User A"
+
+# 4. Link the local repository to the central server
+goit remote add origin http://localhost:8080/test-repo
+
+# 5. Push the code to the central server
 goit push origin main
+```
+
+### Phase 3: User B Clones and Contributes
+User B joins the team and needs to pull down the existing code, make their own changes, and push them back.
+
+```bash
+# 1. User B clones the repository directly from the server
+goit clone http://localhost:8080/test-repo ~/user-b-workspace
+cd ~/user-b-workspace
+
+# 2. User B makes a new file and commits the changes
+echo "User B's new feature" > feature.txt
+goit add .
+goit commit -m "Added new feature file"
+
+# 3. User B pushes their changes back to the server
+# (The remote 'origin' is automatically configured during clone)
+goit push origin main
+```
+
+### Phase 4: User A Synchronizes (Pulls Changes)
+User A now needs to update their local workspace to include the new feature built by User B.
+
+```bash
+# 1. User A returns to their workspace
+cd ~/user-a-workspace
+
+# 2. User A pulls the latest changes from the server
+# This will fetch the new loose objects and trigger a fast-forward or 3-way merge
+goit pull origin main
+
+# 3. User A can verify the new files exist
+cat feature.txt
 ```
 
 ## Command Reference
