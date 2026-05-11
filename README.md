@@ -31,19 +31,46 @@ Goit is capable of distributed synchronization across different machines.
 
 ## Installation & Setup
 
-* Goit requires Go 1.25.1 or higher.
-* The CLI interface is built using the `cobra` framework.
+You can install Goit either by building it from the source code or by downloading a pre-built standalone binary.
+
+### Option 1: Build from Source (Requires Go)
+Goit requires Go 1.25.1 or higher. The CLI interface is built using the `cobra` framework.
 
 ```bash
 # Clone the source code
 git clone [https://github.com/Souvik606/goit.git](https://github.com/Souvik606/goit.git)
 cd goit
 
-# Build the binary
+# Install the binary directly to your GOPATH
+go install .
+
+# Alternatively, you can build the binary manually
 go build -o goit main.go
 
-# Add to your PATH (optional)
+# Add to your PATH (if not using 'go install')
 mv goit /usr/local/bin/
+```
+
+### Option 2: Using Pre-built Binaries (No Go Required)
+If you do not have Go installed on your machine, you can download the standalone executables directly from GitHub Releases.
+
+Navigate to the Releases page of this repository.
+
+Download the binary matching your operating system and architecture (e.g., ```goit-windows-amd64.exe```, ```goit-linux-amd64```, ```goit-darwin-amd64```).
+
+Rename the downloaded file to goit (or goit.exe on Windows).
+
+Move the file into a directory that is in your system's PATH (e.g., /usr/local/bin for Linux/Mac, or add the folder to your Windows Environment Variables).
+
+Open your terminal and run goit to verify the installation.
+
+## Getting Help
+Once installed, you can learn more about the tool and explore available commands by simply running:
+
+```
+goit
+# or
+goit help
 ```
 
 ## Hosting Your Own Goit Server (Acting as GitHub)
