@@ -1,0 +1,48 @@
+name: Build and Release Goit
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Build and Upload Assets
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.1"
+
+      - name: Compile Binaries for Multiple OS/Arch
+        run: |
+          echo "Building for Windows (amd64)..."
+          GOOS=windows GOARCH=amd64 go build -o goit-windows-amd64.exe main.go
+
+          echo "Building for Linux (amd64)..."
+          GOOS=linux GOARCH=amd64 go build -o goit-linux-amd64 main.go
+
+          echo "Building for macOS (Intel)..."
+          GOOS=darwin GOARCH=amd64 go build -o goit-darwin-amd64 main.go
+
+          echo "Building for macOS (Apple Silicon M1/M2/M3)..."
+          GOOS=darwin GOARCH=arm64 go build -o goit-darwin-arm64 main.go
+
+      - name: Create GitHub Release and Upload Binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            goit-windows-amd64.exe
+            goit-linux-amd64
+            goit-darwin-amd64
+            goit-darwin-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
