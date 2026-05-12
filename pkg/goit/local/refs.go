@@ -133,6 +133,15 @@ func ResolveTarget(target string) (hash string, refPath string, err error) {
 		return hash, refPath, err
 	}
 
+	remoteRefPath := "refs/remotes/origin/" + target
+	fullRemotePath := getRefPath(remoteRefPath)
+
+	if _, err := os.Stat(fullRemotePath); err == nil {
+		hash, _ := GetRefHash(remoteRefPath)
+		UpdateRef(refPath, hash)
+		return hash, refPath, nil
+	}
+
 	return "", "", fmt.Errorf("fatal: '%s' is not a commit and a branch '%s' cannot be created from it", target, target)
 }
 

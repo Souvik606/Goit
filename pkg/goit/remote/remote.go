@@ -365,6 +365,9 @@ func GoitPush(remoteName, branchName string) error {
 		return fmt.Errorf("server rejected push: %s", string(body))
 	}
 
+	trackingRef := "refs/remotes/" + remoteName + "/" + branchName
+	local.UpdateRef(trackingRef, localHash)
+
 	fmt.Println("Push successful.")
 	return nil
 }
